@@ -1,0 +1,107 @@
+diff --git a/dwm.c b/dwm.c
+index a96f33c..4152f9d 100644
+--- a/dwm.c
++++ b/dwm.c
+@@ -20,6 +20,8 @@
+  *
+  * To understand everything else, start reading main().
+  */
++
++#include <time.h>
+ #include <errno.h>
+ #include <locale.h>
+ #include <signal.h>
+@@ -1377,11 +1379,21 @@ void
+ run(void)
+ {
+ 	XEvent ev;
++	time_t prev_time = time(NULL);
++
+ 	/* main event loop */
+ 	XSync(dpy, False);
+ 	while (running && !XNextEvent(dpy, &ev))
++	{
++		if (time(NULL) - prev_time >= 10)
++		{
++			updatestatus();
++			prev_time = time(NULL);
++		}
++		
+ 		if (handler[ev.type])
+ 			handler[ev.type](&ev); /* call handler */
++	}
+ }
+ 
+ void
+@@ -1990,11 +2002,70 @@ updatesizehints(Client *c)
+ 	c->isfixed = (c->maxw && c->maxh && c->maxw == c->minw && c->maxh == c->minh);
+ }
+ 
++char
++*get_date()
++{
++    char *date = malloc(16);
++    
++    time_t rawtime = time(NULL);
++	struct tm *ptm = localtime(&rawtime);
++
++    strftime(date, 16, "%b %d %R", ptm);
++
++    return date;
++}
++
++char 
++*get_cpu_temp()
++{
++   FILE *fp;
++   char buff[16];
++
++   fp = fopen("/sys/class/hwmon/hwmon1/temp1_input", "r");
++   fgets(buff, 16, (FILE*)fp);
++   fclose(fp);
++
++   int cpu_temp = atoi(buff) / 1000;
++   char *cpu_temp_p = malloc(sizeof(cpu_temp));
++   sprintf(cpu_temp_p, "%d", cpu_temp);
++
++   return cpu_temp_p;
++}
++
++char 
++*get_full_loadavg()
++{
++    char *full_loadavg = malloc(32);
++
++    double loadavg[3];
++    getloadavg(loadavg, 3);
++    sprintf(full_loadavg, "%.2f %.2f %.2f", loadavg[0], loadavg[1], loadavg[2]);
++
++    return full_loadavg;
++}
++
+ void
+ updatestatus(void)
+ {
+-	if (!gettextprop(root, XA_WM_NAME, stext, sizeof(stext)))
+-		strcpy(stext, "dwm-"VERSION);
++	char bar[255];
++	bar[0] = '\0';
++    
++    char *date = get_date();
++    char *cpu_temp = get_cpu_temp();
++    char *full_loadavg = get_full_loadavg();
++
++    strcat(bar, full_loadavg);
++    strcat(bar, " | ");
++    strcat(bar, cpu_temp);
++    strcat(bar, "C | ");
++    strcat(bar, date);
++
++    strcpy(stext, bar);
++
++	free(date);
++    free(cpu_temp);
++    free(full_loadavg);
++
+ 	drawbar(selmon);
+ }
